@@ -17,16 +17,16 @@ class GroupController extends API_Controller
 
     private $group;
     private $group_id;
-    private $_my_authority;
+    private $_my_authority = null;
 
     // ENTRY POINTS
 
-    public function activate(Request $request, $group_id) {
+    /**public function activate(Request $request, $group_id) {
         $this->group_id = $group_id;
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Activated');
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
+    }*/
 
     public function create(Request $request) {
         $this->v_object_function_authority_check = false;
@@ -35,21 +35,21 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    public function deactivate(Request $request, $group_id) {
+    /**public function deactivate(Request $request, $group_id) {
         $this->group_id = $group_id;
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deactivated');
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
+    }*/
 
-    public function delete(Request $request, $group_id) {
+    /**public function delete(Request $request, $group_id) {
         $this->group_id = $group_id;
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deleted');
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
+    }*/
 
-    public function list(Request $request) { 
+    public function mygroups(Request $request) { 
         $this->v_object_function_authority_check = false;
         $this->_process_control($request, __FUNCTION__, $this->rest_200_ok, null);
         return Response()->json($this->response_payload, $this->rest_response); 
@@ -61,11 +61,11 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    public function search(Request $request) { 
+    /**public function search(Request $request) { 
         $this->v_object_function_authority_check = false;
         $this->_process_control($request, __FUNCTION__, $this->rest_200_ok, null);
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
+    }*/
 
     public function update(Request $request, $group_id) { 
         $this->group_id = $group_id;
@@ -74,14 +74,14 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    public function update_image(Request $request, $group_id) { 
+    /**public function update_image(Request $request, $group_id) { 
         $this->group_id = $group_id;
         $this->v_422_rules = [ 
             'imgSrc' => 'required'
         ];
         $this->_process_control($request, $group_id, __FUNCTION__, $this->rest_202_accepted, 'Group Image Updated');
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
+    }*/
 
     // PROCESSING LOGIC
 
@@ -98,14 +98,13 @@ class GroupController extends API_Controller
         $this->group->name = $request->name;
         $this->group->description = $request->description;
         $this->group->visibility = $request->visibility;
-        $this->group->allow_to_add_events = 'none';
+        $this->group->allow_to_add_events = 'no-one';
         $this->group->request_to_join_rule = 'approval';
         $this->group->rules = [];
         $this->group->owner_id = Auth::id();
-        $this->group->image = null;
         $this->group->status = 'active';
-        $this->group->image = null;
-        $this->group->image_history = null;
+        $this->group->photo = null;
+        $this->group->photo_history = null;
         $this->group->save();
 
         //Create Group Owner Membership Record
@@ -133,25 +132,28 @@ class GroupController extends API_Controller
         return true;
     }
 
-    protected function p_list(Request $request) {
+    protected function p_mygroups(Request $request) {
 
         $myGroup_ids = GroupMember::select('group_id')->where('user_id' ,'=', Auth::id())->where('status', '!=', 'blocked')
                                              ->pluck('group_id')->toArray();
 
-        $this->response_payload = Group::with(array('owner', 'myMember' => function($query) { $query->where('user_id', '=', Auth::id()); } ))
-                                       ->withCount(array('members' => function($query2) { $query2->where('status', '=', 'active'); } ))
-                                       ->whereIn('id', $myGroup_ids)
-                                       ->orderBy('name')
-                                       ->get();
-        
+        $this->response_payload ['groups'] = 
+            Group::with(array('owner', 'myMember' => function($query) { $query->where('user_id', '=', Auth::id()); } ))
+                    ->withCount(array('members' => function($query2) { $query2->where('status', '=', 'active'); } ))
+                    ->whereIn('id', $myGroup_ids)
+                    ->orderBy('name')
+                    ->get();
+
         return true;
     }
 
     protected function p_retrieve(Request $request) {
 
         $this->response_payload = Group::with(array('members' => function($query) { $query->where('status', '=', 'active'); }, 
-                                                              'members.user') )
-                                                 ->find($this->group_id);
+                                                    'members.user') )
+                                        ->find($this->group_id);
+
+        $this->response_payload ['_my_authority'] = $this->_my_authority;
 
         return true;
     }
@@ -181,16 +183,27 @@ class GroupController extends API_Controller
                                        ->get();
         
         
-       $this->response_payload['_my_authority'] = $this->my_authority;
+       $this->response_payload['_my_authority'] = $this->_my_authority;
 
-        return true;
+       return true;
     }
 
     protected function p_update(Request $request) {
-        $this->setupAttributes($request, 'update');
+
+        $this->group->name = $request->name;
+        $this->group->description = $request->description;
+        //$this->group->visibility = $request->visibility;
+        $this->group->allow_to_add_events = $request->allow_to_add_events;
+        $this->group->request_to_join_rule = $request->request_to_join_rule;
+        $this->group->rules = array_filter($request->rules);
+
+        if ($request->hasFile('photo')) {
+            $this->group->photo = $this->saveSingleImage('group_image', 'photo', $request);
+        }
+
         $this->group->update();
-        $this->response_payload = $this->returnGroup($this->group_id);
-        return true;
+        
+        return $this->p_retrieve($request);
     }
 
     protected function p_update_image(Request $request) {
@@ -237,11 +250,11 @@ class GroupController extends API_Controller
 
     protected function returnGroup($group_id) {
 
-        $group_plus = Group::with(array('owner', 'my_member' => function($query) { $query->where('user_id', '=', Auth::id()); } ))
+        $group_plus = Group::with(array('owner', 'myMember' => function($query) { $query->where('user_id', '=', Auth::id()); } ))
                            ->withCount(array('members' => function($query2) { $query2->where('status', '=', 'active'); } ))
                            ->find($group_id);
 
-        $group_plus['_my_authority'] = $this->my_authority;
+        $group_plus['_my_authority'] = $this->_my_authority;
 
         return $group_plus;
 
@@ -278,19 +291,17 @@ class GroupController extends API_Controller
             $this->v_422_rules = [ 
                 'name' => 'required|min:2|max:50',
                 'visibility' => 'required|in:private,friends,public',
-                'requestToJoinRule' => 'required|in:auto,approval',
-                'allowToAddEvents' => 'required|in:none,owner,admin,member',
+                'request_to_join_rule' => 'required|in:auto,approval',
+                'allow_to_add_events' => 'required|in:no-one,owner,admin,member',
                 'description' => 'required|min:2|max:500',
                 'rules' => 'nullable|array',
-                'rules.*' => 'max:255'
-                //'imgSrc' => 'required',
-                //'groupMembers' => 'nullable|array',
-                //'groupMembers.*' => 'exists:users,id'
+                'rules.*' => 'max:500',
+                'photo' => 'required'
             ];
         }
 
         $this->v_422_messages = [
-            'rules.*.max' => 'Cannot be longer than 255 characters',
+            'rules.*.max' => 'Cannot be longer than 500 characters',
         ];
 
     }
@@ -325,23 +336,23 @@ class GroupController extends API_Controller
             $member_status = $my_group_member->status;
         }
 
-        // member Role . function . group status . visibility
+        // member Role . member status . function . group status . visibility
 
-        $conditions_array = ['owner.*.*.*',
-                             'admin.update.*.*',
-                             'admin.retrieve.*.*',
-                             'admin.deactivate.*.*',
-                             'admin.activate.*.*',
-                             'member.retrieve.*.*',
-                             'guest.retrieve.*.*'
+        $conditions_array = ['owner.active.*.*.*',
+                             'admin.active.update.*.*',
+                             'admin.active.retrieve.*.*',
+                             'admin.active.deactivate.*.*',
+                             'admin.active.activate.*.*',
+                             'member.active.retrieve.*.*',
+                             'guest.active.retrieve.*.*'
                             ];
         
         // Story not in correct state for requested action
 
-        $check_condition_1 = $user_role . '.' . $action . '.' . $this->group->status . '.' . $this->group->visibility;
-        $check_condition_2 = $user_role . '.' . $action . '.' . $this->group->status . '.*';
-        $check_condition_3 = $user_role . '.' . $action . '.*.*';
-        $check_condition_4 = $user_role . '.*.*.*';
+        $check_condition_1 = $member_role . '.' . $member_status . '.' . $action . '.' . $this->group->status . '.' . $this->group->visibility;
+        $check_condition_2 = $member_role . '.' . $member_status . '.' . $action . '.' . $this->group->status . '.*';
+        $check_condition_3 = $member_role . '.' . $member_status . '.' . $action . '.*.*';
+        $check_condition_4 = $member_role . '.' . $member_status . '.*.*.*';
 
         if (!in_array($check_condition_1, $conditions_array)
             && !in_array($check_condition_2, $conditions_array)
@@ -354,7 +365,7 @@ class GroupController extends API_Controller
             return false;
         }
 
-        $this->my_authority = $user_role;
+        $this->_my_authority = $member_role;
 
         return true;
     

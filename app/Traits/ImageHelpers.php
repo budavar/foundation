@@ -11,7 +11,8 @@ trait ImageHelpers
 {
 
     private $image_types = [
-      'profile_avatar' => ['image_category' => 'profile', 'folder' => 'profile_images']
+      'profile_avatar' => ['image_category' => 'profile', 'folder' => 'profile_images'],
+      'group_image' => ['image_category' => 'group', 'folder' => 'group_images']
     ];
 
     private function getBase64Image($image_name) {

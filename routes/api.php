@@ -47,9 +47,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
   // GROUPS
   //Route::get('groups/search', [GroupController::class, 'search'])->name('group.search');
-  //Route::get('groups', [GroupController::class, 'list'])->name('group.list');
+  Route::get('groups/{group_id}', [GroupController::class, 'retrieve'])->name('group.retrieve');
+  Route::get('groups', [GroupController::class, 'mygroups'])->name('group.list');
+  Route::post('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   Route::post('groups', [GroupController::class, 'create'])->name('group.create');
-  //Route::get('groups/{group_id}', [GroupController::class, 'retrieve'])->name('group.retrieve');
   //Route::put('groups/{group_id}/updateimage', [GroupController::class, 'update_image'])->name('group.update_image');
   //Route::put('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   //Route::put('groups/{group_id}/open', [GroupController::class, 'open'])->name('group.open');
