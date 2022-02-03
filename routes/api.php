@@ -45,12 +45,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
   Route::put('friends/block/{id}', [FriendController::class, 'block'])->name('friend.block');
   Route::delete('friends/delete/{id}', [FriendController::class, 'delete'])->name('friend.delete');
 
+  // PEOPLE
+  Route::get('people/my-friends', [PeopleController::class, 'myFriends'])->name('people.myFriends');
+  Route::get('people/search', [PeopleController::class, 'search'])->name('people.search');
+
   // GROUPS
   //Route::get('groups/search', [GroupController::class, 'search'])->name('group.search');
   Route::get('groups/{group_id}', [GroupController::class, 'retrieve'])->name('group.retrieve');
   Route::get('groups', [GroupController::class, 'mygroups'])->name('group.list');
   Route::post('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   Route::post('groups', [GroupController::class, 'create'])->name('group.create');
+  Route::post('groups/{group_id}/new-member', [GroupMemberController::class, 'joinRequest'])->name('group.joinRequest');
   //Route::put('groups/{group_id}/updateimage', [GroupController::class, 'update_image'])->name('group.update_image');
   //Route::put('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   //Route::put('groups/{group_id}/open', [GroupController::class, 'open'])->name('group.open');
@@ -58,6 +63,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
   //Route::post('groups/{group_id}/like', [socialController::class, 'like'])->name('group.like');
   //Route::post('groups/{group_id}/unlike', [socialController::class, 'unlike'])->name('group.unlike');
+
+
 
 
 });

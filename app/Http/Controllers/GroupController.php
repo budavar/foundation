@@ -291,7 +291,7 @@ class GroupController extends API_Controller
             $this->v_422_rules = [ 
                 'name' => 'required|min:2|max:50',
                 'visibility' => 'required|in:private,friends,public',
-                'request_to_join_rule' => 'required|in:auto,approval',
+                'request_to_join_rule' => 'required|in:automatic,approval',
                 'allow_to_add_events' => 'required|in:no-one,owner,admin,member',
                 'description' => 'required|min:2|max:500',
                 'rules' => 'nullable|array',

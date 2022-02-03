@@ -22,221 +22,87 @@ class GroupMemberController extends API_Controller
 
     // ENTRY POINTS
     
-    public function approve(Request $request, $group_member_id) { 
+    /**public function accept(Request $request, $group_member_id) { 
         $this->group_member_id = $group_member_id;
         $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['pending'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
         return Response()->json($this->response_payload, $this->rest_response); 
-    }    
+    }
     
     public function block(Request $request, $group_member_id) { 
         $this->group_member_id = $group_member_id;
         $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['active', 'pending'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
         return Response()->json($this->response_payload, $this->rest_response); 
     }  
 
-    public function cancelRequest(Request $request, $group_member_id) { 
+    public function changeRole(Request $request, $group_member_id) { 
         $this->group_member_id = $group_member_id;
         $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['pending'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }
-
-    public function create(Request $request, $group_id) {
-        $this->group_id = $group_id;
-        $this->v_422_rules = [ 
-            'user_id' => 'required'
-        ];
-        $this->v_4xx_validation = true;
-        $this->_process_control($request, $group_id, __FUNCTION__, $this->rest_202_accepted, 'member_created');
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
     public function delete(Request $request, $group_member_id) { 
         $this->group_member_id = $group_member_id;
         $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['active', 'blocked', 'pending'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
+    }*/
 
-    public function list(Request $request, $group_id) {
-        $this->group_id = $group_id;
-        $this->_process_control($request, $group_id, __FUNCTION__, $this->rest_200_ok, null);
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }
-
-    public function makeAdmin(Request $request, $group_member_id) { 
-        $this->group_member_id = $group_member_id;
-        $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['active'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }
-
-    public function makeMember(Request $request, $group_member_id) { 
-        $this->group_member_id = $group_member_id;
-        $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['active', 'blocked'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }
-
-    public function requestToJoin(Request $request, $group_id) {
+    public function joinRequest(Request $request, $group_id) {
         $this->group_id = $group_id;
         $this->v_422_rules = [ 
             'user_id' => 'required'
         ];
         $this->v_4xx_validation = true;
-        $this->_process_control($request, $group_id, __FUNCTION__, $this->rest_202_accepted, 'request_created');
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'member_created');
         return Response()->json($this->response_payload, $this->rest_response); 
     }
-
-    public function unblock(Request $request, $group_member_id) { 
-        $this->group_member_id = $group_member_id;
-        $this->v_4xx_validation = true;
-        $this->p_processing_data['valid_statii'] = ['blocked'];
-        $this->_process_control($request, $group_member_id, __FUNCTION__, $this->rest_202_accepted, null);
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }  
 
     // PROCESSING LOGIC
 
-    protected function p_approve(Request $request) {
-        return $this->updateGroupMemberStatus('active');
-    }
+    protected function p_joinRequest(Request $request) {
 
-    protected function p_block(Request $request) {
-        return $this->updateGroupMemberStatus('blocked');
-    }
+        $group_member = new GroupMember;
+        $group_member->group_id = $this->group->id;
+        $group_member->user_id = $request->user_id;
+        $group_member->role = 'member';
 
-    protected function p_cancelRequest(Request $request) {
-        return $this->removeGroupMember();
-    }
-
-    protected function p_create(Request $request) {
-        $this->response_payload['result'] ['new_member'] = $this->createGroupMember($request, 'active');
-        return true;
-    }
-
-    protected function p_delete(Request $request) {
-        return $this->removeGroupMember();
-    }
-
-    protected function p_list(Request $request) {
-
-        if ($request->query('scope') == '*') { 
-            $this->response_payload['result'] = GroupMember::with('user')
-                                                            ->where('group_id', '=', $this->group->id)
-                                                            ->get();
-
+        if (Auth::id() == $request->user_id) {
+            $group_member->status = 'requested';
         } else {
-            $this->response_payload['result'] = GroupMember::with('user')
-                                                            ->where('group_id', '=', $this->group->id)
-                                                            ->where('status', '=', $request->query('scope'))
-                                                            ->get();
+            $group_member->status = 'invited';
         }
-        return true;
-    }
-    
-    protected function p_makeAdmin(Request $request) {
-        return $this->updateGroupMemberRole('admin');
-    }
-    
-    protected function p_makeMember(Request $request) {
-        return $this->updateGroupMemberRole('member');
-    }
 
-    protected function p_requestToJoin(Request $request) {
-
-        if ($this->group->join_rule == 'auto') {
-            $this->response_payload['result'] ['new_member'] = $this->createGroupMember($request, 'active');
-        } else {
-            $this->response_payload['result'] ['new_member'] = $this->createGroupMember($request, 'pending');
+        if ($this->group->request_to_join_rule == 'automatic') {
+            $group_member->status = 'active';
         }
-        return true;
-    }
 
-    protected function p_unblock(Request $request) {
-        return $this->updateGroupMemberStatus('active');
+        $group_member->save();
+
+        $this->response_payload = $this->returnMember($group_member->id);
+        return true;
     }
     
     // VALIDATION LOGIC
-    protected function v_4XX_approve(Request $request) {
-        return $this->checkMemberStatus();
-    }
 
-    protected function v_4XX_block(Request $request) {
-        return $this->checkMemberStatus();
-    }
+    protected function v_4XX_joinRequest(Request $request) {
+        //Cannot already be a member or pending request
 
-    protected function v_4XX_cancelRequest(Request $request) {
-        return $this->checkMemberStatus();
-    }
-
-    protected function v_4XX_create(Request $request) {
-
-        //Cannot already be a member or have request pending
-        
-        if ($this->checkAlreadyMember($request->user_id)) {
-            return false;
-        }
-
-        // Must be a friend of the user
-
-        if (!in_array($request->user_id, $this->getMyFriendIds(['accepted']))) {
+        if (GroupMember::where('group_id', '=', $this->group->id)->where('user_id', '=', $request->user_id)->exists()) {
             $this->rest_response = $this->rest_405_methodNotAllowed;
-            $this->response_payload['logic-errors'] = 'You can only invite your friends'; 
+            $this->response_payload['logic-errors'] = 'User is already a member'; 
             return false;
         }
 
         return true;
-
-    }
-
-    protected function v_4XX_delete(Request $request) {
-        return $this->checkMemberStatus();
-    }
-
-    protected function v_4XX_makeAdmin(Request $request) {
-        return $this->checkMemberStatus();
-    }
-
-    protected function v_4XX_makeMember(Request $request) {
-        return $this->checkMemberStatus();
-    }
-
-    protected function v_4XX_requestToJoin(Request $request) {
-        //Cannot already be a member or have request pending
-
-        if ($this->checkAlreadyMember($request->user_id)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    protected function v_4XX_unblock(Request $request) {
-        return $this->checkMemberStatus();
     }
     
     // COMMON LOGIC
 
-    protected function checkAlreadyMember($user_id) {
-
-        if (GroupMember::where('group_id', '=', $this->group->id)->where('user_id', '=', $user_id)->exists()
-            || $this->group->owner_id == $user_id) {
-            $this->rest_response = $this->rest_405_methodNotAllowed;
-            $this->response_payload['logic-errors'] = 'user_already_member'; 
-            return true;
-        } else {
-            return false;
-        }
-
+    protected function returnMember($id) {
+        return GroupMember::with('user')->find($id);
     }
 
     protected function checkMemberStatus() {
@@ -249,24 +115,6 @@ class GroupMemberController extends API_Controller
             $this->response_payload['result'] ['b'] = $this->p_processing_data['valid_statii']; 
             return false;
         }
-    }
-
-    protected function createGroupMember($request, $status) {
-        $group_member = new GroupMember;
-        $group_member->group_id = $this->group->id;
-        $group_member->user_id = $request->user_id;
-        $group_member->role = 'member';
-        $group_member->status = $status;
-
-        $group_member->save();
-
-        return GroupMember::with('user')
-                            ->find($group_member->id);
-    }
-
-    protected function removeGroupMember() {
-        $this->group_member->delete();
-        return true;
     }
 
     protected function updateGroupMemberRole($new_role) {
@@ -288,6 +136,10 @@ class GroupMemberController extends API_Controller
 
     protected function object_function_authority_check($action) {
         
+        $target_member_role = 'not-a-member';
+        $target_member_status = 'not-a-member';
+        $target_member_id = null;
+
         if ($this->group_member_id != null) {
             $this->group_member = GroupMember::find($this->group_member_id);
             if (!$this->group_member) {
@@ -295,6 +147,9 @@ class GroupMemberController extends API_Controller
                 $this->response_payload['logic_errors'] = 'Invalid group member resource identifier - ' . $this->group_member_id;
                 return false;
             } else {
+                $target_member_role = $this->group_member->role;
+                $target_member_status = $this->group_member->status;
+                $target_member_id = $this->group_member->id;
                 $this->group_id = $this->group_member->group_id;
             }
         }
@@ -307,55 +162,52 @@ class GroupMemberController extends API_Controller
             $this->response_payload['logic_errors'] = 'Invalid group resource identifier - ' . $this->group_id;
             return false;
         } else {
-            if ($action == 'list') {
-                $this->group_member = GroupMember::where('group_id', '=', $this->group->id)
-                                                    ->where('user_id', '=', Auth::id())
-                                                    ->first();
-                if ($this->group_member) {
-                    $this->group_member_id = $this->group_member->id;
-                }
+            if ($this->group->status != 'active') {
+                $this->rest_response = $this->rest_405_methodNotAllowed;
+                $this->response_payload['logic_errors'] = 'Invalid status on group resource identifier - ' . $this->group_id;
+                return false;
             }
         }
 
-        if ($this->group->owner_id == Auth::id()) {
-            $user_role = 'owner';
-            $user_status = 'active';
-            Log::info('GOT TO OWNER');
+        $member_role = 'not-a-member';
+        $member_status = 'not-a-member';
+        $member_id = null;
+
+        $this->my_group_member = GroupMember::where('group_id', '=', $this->group->id)
+                                            ->where('user_id', '=', Auth::id())
+                                            ->first();
+
+        if ($this->my_group_member) {
+            $member_role = $this->my_group_member->role;
+            $member_status = $this->my_group_member->status;
+            $member_id = $this->my_group_member->id;
+        }
+
+        if ($target_member_id == $member_id) {
+            $action_on_member = 'self';
         } else {
-            if ($this->group_member) {
-                $user_role = $this->group_member->role;
-                $user_status = $this->group_member->status;
-                Log::info('GOT TO MEMBER');
-                Log::info($this->group_member);
-            } else {
-                $user_role = 'not-a-member';
-                $user_status = 'XXX';
-            }
+            $action_on_member = 'other';
         }
 
-        $conditions_array = ['owner.active.approve',
-                             'owner.active.block',
-                             'owner.active.create',
-                             'owner.active.delete',
-                             'owner.active.list',
-                             'owner.active.makeAdmin',
-                             'owner.active.makeMember',
-                             'owner.active.unblock',
-                             'admin.active.approve',
-                             'admin.active.block',
-                             'admin.active.create',
-                             'admin.active.delete',
-                             'admin.active.list',
-                             'admin.active.makeAdmin',
-                             'admin.active.makeMember',
-                             'admin.active.unblock',
-                             'member.active.delete',
-                             'member.pending.cancelRequest', 
-                             'not-a-member.XXX.requestToJoin'
+        $conditions_array = ['owner.active.accept.other',
+                             'owner.active.block.other',
+                             'owner.active.changeRole.other',
+                             'owner.active.delete.other',
+                             'owner.active.joinRequest.other',
+                             'admin.active.accept.other',
+                             'admin.active.block.other',
+                             'admin.active.changeRole.self',
+                             'admin.active.changeRole.other',
+                             'admin.active.delete.self',
+                             'admin.active.delete.other',
+                             'admin.active.joinRequest.other',
+                             'member.request.delete.self',
+                             'member.request.accept.self', 
+                             'not-a-member.not-a-member.joinRequest.self'
                             ];
         
         // Story not in correct state for requested action
-        $check_condition = $user_role . '.' . $user_status . '.' . $action;
+        $check_condition = $user_role . '.' . $user_status . '.' . $action . '.' . $action_on_member;
 
         if (!in_array($check_condition, $conditions_array)) {
             $this->response_payload['add-on-data'] = ['check_condition' => $check_condition, 
@@ -365,14 +217,10 @@ class GroupMemberController extends API_Controller
             return false;
         }
 
-        if ($action == 'delete' && $user_role == 'member') {
-            if (Auth::id() != $this->group_member->user_id) {
-                $this->response_payload['add-on-data'] = ['check_condition' => $check_condition, 
-                'conditions_array' => $conditions_array];
-                $this->rest_response = $this->rest_405_methodNotAllowed;
-                $this->response_payload['logic_errors'] = 'Group resource authority / Action Mismatch for member delete';
-                return false;
-            }
+        if ($target_member_role == 'owner') {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic_errors'] = 'Not allowed to perform action on owner profile';
+            return false;
         }
         
         return true;
