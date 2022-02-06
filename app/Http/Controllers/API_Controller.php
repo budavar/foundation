@@ -39,7 +39,7 @@ class API_Controller extends BaseController
     public $rest_501_invalidMethod = 501;
 
     public $rest_response = null;
-    public $response_payload = [];
+    public $response_payload = null;
 
     protected $v_object_function_authority_check = true;
     protected $v_422_rules = [];

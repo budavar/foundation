@@ -50,17 +50,24 @@ Route::middleware(['auth:sanctum'])->group(function () {
   Route::get('people/search', [PeopleController::class, 'search'])->name('people.search');
 
   // GROUPS
-  //Route::get('groups/search', [GroupController::class, 'search'])->name('group.search');
+  Route::get('groups/search', [GroupController::class, 'search'])->name('group.search');
   Route::get('groups/{group_id}', [GroupController::class, 'retrieve'])->name('group.retrieve');
   Route::get('groups', [GroupController::class, 'mygroups'])->name('group.list');
   Route::post('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   Route::post('groups', [GroupController::class, 'create'])->name('group.create');
+
+  // GROUP MEMBERS
   Route::post('groups/{group_id}/new-member', [GroupMemberController::class, 'joinRequest'])->name('group.joinRequest');
+  Route::delete('group-members/{group_member_id}', [GroupMemberController::class, 'remove'])->name('groupMember.remove');
+  Route::put('group-members/{group_member_id}/activate', [GroupMemberController::class, 'activate'])->name('groupMember.activate');
+  Route::put('group-members/{group_member_id}/block', [GroupMemberController::class, 'block'])->name('groupMember.block');
+  Route::put('group-members/{group_member_id}/change-member-role', [GroupMemberController::class, 'changeRole'])->name('groupMember.chnageRole');
+
+
   //Route::put('groups/{group_id}/updateimage', [GroupController::class, 'update_image'])->name('group.update_image');
   //Route::put('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   //Route::put('groups/{group_id}/open', [GroupController::class, 'open'])->name('group.open');
   //Route::put('groups/{group_id}/close', [GroupController::class, 'close'])->name('group.close');
-
   //Route::post('groups/{group_id}/like', [socialController::class, 'like'])->name('group.like');
   //Route::post('groups/{group_id}/unlike', [socialController::class, 'unlike'])->name('group.unlike');
 

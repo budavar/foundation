@@ -35,13 +35,6 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    /**public function deactivate(Request $request, $group_id) {
-        $this->group_id = $group_id;
-        $this->v_4xx_validation = true;
-        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deactivated');
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }*/
-
     /**public function delete(Request $request, $group_id) {
         $this->group_id = $group_id;
         $this->v_4xx_validation = true;
@@ -61,11 +54,18 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    /**public function search(Request $request) { 
+    public function search(Request $request) { 
         $this->v_object_function_authority_check = false;
         $this->_process_control($request, __FUNCTION__, $this->rest_200_ok, null);
         return Response()->json($this->response_payload, $this->rest_response); 
-    }*/
+    }
+
+    public function suspend(Request $request, $group_id) {
+        $this->group_id = $group_id;
+        $this->v_4xx_validation = true;
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deactivated');
+        return Response()->json($this->response_payload, $this->rest_response); 
+    }
 
     public function update(Request $request, $group_id) { 
         $this->group_id = $group_id;
@@ -149,9 +149,14 @@ class GroupController extends API_Controller
 
     protected function p_retrieve(Request $request) {
 
-        $this->response_payload = Group::with(array('members' => function($query) { $query->where('status', '=', 'active'); }, 
-                                                    'members.user') )
-                                        ->find($this->group_id);
+        if ($this->_my_authority == 'member') {
+            $this->response_payload = 
+                Group::with(array('members' => function($query) { $query->where('status', '=', 'active'); }, 'members.user') )
+                    ->find($this->group_id);
+        } else {
+            $this->response_payload = 
+                Group::with(array('members', 'members.user'))->find($this->group_id);
+        }
 
         $this->response_payload ['_my_authority'] = $this->_my_authority;
 
@@ -160,32 +165,25 @@ class GroupController extends API_Controller
 
     protected function p_search(Request $request) {
 
-        $myGroup_ids = GroupMember::select('group_id')->where('user_id' ,'=', Auth::id())->where('status', '!=', 'blocked')
-                                             ->pluck('group_id')->toArray();
-        
+        $myGroup_ids = GroupMember::select('group_id')->where('user_id' ,'=', Auth::id())->pluck('group_id')->toArray();
         $myFriends = $this->getMyFriendIds(['accepted']);
 
-        $myFriends_group_ids = Group::select('id')
-                                    ->whereIn('owner_id', $myFriends)
-                                    ->where('visibility', '!=', 'private')
-                                    ->where('status', '=', 'active')
-                                    ->pluck('id')->toArray();
-        
-        $friend_groups_am_not_member = array_diff($myFriends_group_ids, $myGroup_ids);
+        $get_groups = 
+            Group::with('owner')
+                ->withCount(array('members' => function($query2) { $query2->where('status', '=', 'active'); } ))
+                ->whereNotIn('id', $myGroup_ids)
+                ->where('visibility', '=', 'public')
+                ->where('status', '=', 'active')
+                ->where('name', 'LIKE', '%'.$request->query('search_string').'%')
+                ->orderBy('name');
 
-        $this->response_payload = Group::with('owner')
-                                       ->withCount(array('members' => function($query2) { $query2->where('status', '=', 'active'); } ))
-                                       ->whereIn('id', $friend_groups_am_not_member)
-                                       ->where('visibility', '=', 'friends')
-                                       ->orWhere('visibility', '=', 'public')
-                                       ->whereNotIn('id', $myGroup_ids)
-                                       ->orderBy('name')
-                                       ->get();
-        
-        
-       $this->response_payload['_my_authority'] = $this->_my_authority;
+        if ($request->query('scope') == 'friend-groups') {
+            $get_groups->whereIn('owner_id', $myFriends);
+        }
 
-       return true;
+        $this->response_payload ['groups'] = $get_groups->get();
+
+        return true;
     }
 
     protected function p_update(Request $request) {
@@ -229,6 +227,13 @@ class GroupController extends API_Controller
         }
     }
 
+    protected function v_4XX_delete (Request $request) {
+
+        // Needs work 
+
+        return true;
+    }
+
     protected function v_4XX_deactivate (Request $request) {
         if ($this->group->status != 'active' ) {
             $this->rest_response = $this->rest_405_methodNotAllowed;
@@ -237,13 +242,6 @@ class GroupController extends API_Controller
         } else {
             return true;
         }
-    }
-
-    protected function v_4XX_delete (Request $request) {
-
-        // Needs work 
-
-        return true;
     }
 
     // INTERNAL LOGIC
@@ -336,28 +334,26 @@ class GroupController extends API_Controller
             $member_status = $my_group_member->status;
         }
 
-        // member Role . member status . function . group status . visibility
+        // member Role . member status . function . group status
 
-        $conditions_array = ['owner.active.*.*.*',
-                             'admin.active.update.*.*',
-                             'admin.active.retrieve.*.*',
-                             'admin.active.deactivate.*.*',
-                             'admin.active.activate.*.*',
-                             'member.active.retrieve.*.*',
-                             'guest.active.retrieve.*.*'
+        $conditions_array = ['owner.active.activate.suspended',
+                             'owner.retrieve.delete.suspended',
+                             'owner.retrieve.retrieve.*',
+                             'owner.retrieve.suspend.active',
+                             'owner.retrieve.update.*',
+                             'admin.active.retrieve.*',
+                             'admin.active.update.*',
+                             'member.active.retrieve.*',
+                             'guest.active.retrieve.*'
                             ];
         
         // Story not in correct state for requested action
 
-        $check_condition_1 = $member_role . '.' . $member_status . '.' . $action . '.' . $this->group->status . '.' . $this->group->visibility;
-        $check_condition_2 = $member_role . '.' . $member_status . '.' . $action . '.' . $this->group->status . '.*';
-        $check_condition_3 = $member_role . '.' . $member_status . '.' . $action . '.*.*';
-        $check_condition_4 = $member_role . '.' . $member_status . '.*.*.*';
+        $check_condition_1 = $member_role . '.' . $member_status . '.' . $action . '.' . $this->group->status;
+        $check_condition_2 = $member_role . '.' . $member_status . '.' . $action . '.*';
 
         if (!in_array($check_condition_1, $conditions_array)
-            && !in_array($check_condition_2, $conditions_array)
-            && !in_array($check_condition_3, $conditions_array)
-            && !in_array($check_condition_4, $conditions_array)) {
+            && !in_array($check_condition_2, $conditions_array)) {
             $this->response_payload['add-on-data'] = ['check_condition' => $check_condition_1 . ' - ' . $check_condition_2 . ' - ' . $check_condition_3 . ' - ' . $check_condition_4, 
                                                         'conditions_array' => $conditions_array];
             $this->rest_response = $this->rest_405_methodNotAllowed;

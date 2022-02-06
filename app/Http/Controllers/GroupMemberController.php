@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers;
 
 use Log;
 use Illuminate\Support\Facades\Auth;
@@ -18,11 +18,12 @@ class GroupMemberController extends API_Controller
     private $group;
     private $group_id;
     private $group_member;
+    private $my_group_member;
     private $group_member_id;
 
     // ENTRY POINTS
     
-    /**public function accept(Request $request, $group_member_id) { 
+    public function activate(Request $request, $group_member_id) { 
         $this->group_member_id = $group_member_id;
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
@@ -34,21 +35,14 @@ class GroupMemberController extends API_Controller
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
         return Response()->json($this->response_payload, $this->rest_response); 
-    }  
-
+    } 
+    
     public function changeRole(Request $request, $group_member_id) { 
         $this->group_member_id = $group_member_id;
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
         return Response()->json($this->response_payload, $this->rest_response); 
-    }
-
-    public function delete(Request $request, $group_member_id) { 
-        $this->group_member_id = $group_member_id;
-        $this->v_4xx_validation = true;
-        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }*/
+    } 
 
     public function joinRequest(Request $request, $group_id) {
         $this->group_id = $group_id;
@@ -60,7 +54,37 @@ class GroupMemberController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
+    public function remove(Request $request, $group_member_id) { 
+        $this->group_member_id = $group_member_id;
+        $this->v_4xx_validation = true;
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
+        return Response()->json($this->response_payload, $this->rest_response); 
+    }
+
     // PROCESSING LOGIC
+
+    protected function p_activate(Request $request) {
+        $this->group_member->status = 'active';
+        $this->group_member->role = 'member';
+        $this->group_member->update();
+        $this->response_payload = $this->returnMember($this->group_member_id);
+        return true;
+    }
+
+    protected function p_block(Request $request) {
+        $this->group_member->status = 'blocked';
+        $this->group_member->role = 'member';
+        $this->group_member->update();
+        $this->response_payload = $this->returnMember($this->group_member_id);
+        return true;
+    }
+
+    protected function p_changeRole(Request $request) {
+        $this->group_member->role = $request->change_to_role;
+        $this->group_member->update();
+        $this->response_payload = $this->returnMember($this->group_member_id);
+        return true;
+    }
 
     protected function p_joinRequest(Request $request) {
 
@@ -84,8 +108,71 @@ class GroupMemberController extends API_Controller
         $this->response_payload = $this->returnMember($group_member->id);
         return true;
     }
-    
+
+    protected function p_remove(Request $request) {
+        $this->group_member->delete();
+        $this->response_payload = $this->returnMember($this->group_member);
+        return true;
+    }
+
     // VALIDATION LOGIC
+
+    protected function v_4XX_activate(Request $request) {
+
+        if ($this->group_member->status != 'invited' 
+            && $this->group_member->status != 'requested' 
+            && $this->group_member->status != 'blocked' ) {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'Mismatch between Member Status and Action'; 
+            return false;
+        }
+
+        // You can only accept an invite for your own invitation
+        if ($this->group_member->user_id == Auth::id() && $this->group_member->status != 'invited') {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'User may only self-accept invitation status'; 
+            return false;
+        }
+
+        return true;        
+    }
+
+    protected function v_4XX_block(Request $request) {
+
+        if ($this->group_member->status != 'invited' 
+            && $this->group_member->status != 'requested' 
+            && $this->group_member->status != 'active' ) {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'Mismatch between Member Status and Action'; 
+            return false;
+        }
+
+        if ($this->group_member->user_id == Auth::id()) {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'You cannot block yourself'; 
+            return false;
+        }
+
+        return true;        
+    }
+
+    protected function v_4XX_changeRole(Request $request) {
+
+        if ($request->change_to_role != 'member' 
+            && $request->change_to_role != 'admin') {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'Invalid To-Role requested - ' . $request->query('role'); 
+            return false;
+        }
+
+        if ($this->group_member->role == 'owner') {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'You are not allowed to change the owner'; 
+            return false;
+        }
+
+        return true;        
+    }
 
     protected function v_4XX_joinRequest(Request $request) {
         //Cannot already be a member or pending request
@@ -98,11 +185,29 @@ class GroupMemberController extends API_Controller
 
         return true;
     }
-    
+
+    protected function v_4XX_remove(Request $request) {
+
+        if ($this->group_member->role == 'owner') {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'Not allowed to remove the owner'; 
+            return false;
+        }
+
+        if ($this->my_group_member->role == 'member' && $this->group_member->user_id != Auth::id()) {
+            $this->rest_response = $this->rest_405_methodNotAllowed;
+            $this->response_payload['logic-errors'] = 'You tried to remove a member other than yourself'; 
+            return false;
+        }
+
+        return true;        
+    }
+
     // COMMON LOGIC
 
     protected function returnMember($id) {
-        return GroupMember::with('user')->find($id);
+        $member = GroupMember::with('user')->find($id);
+        return $member;
     }
 
     protected function checkMemberStatus() {
@@ -115,23 +220,6 @@ class GroupMemberController extends API_Controller
             $this->response_payload['result'] ['b'] = $this->p_processing_data['valid_statii']; 
             return false;
         }
-    }
-
-    protected function updateGroupMemberRole($new_role) {
-        $this->group_member->role = $new_role;
-        $this->group_member->save();
-        $this->response_payload['result'] ['updated_member'] = GroupMember::with('user')->find($this->group_member->id);
-        return true;
-    }
-
-    protected function updateGroupMemberStatus($new_status) {
-        $this->group_member->status = $new_status;
-        if ($new_status == 'blocked') {
-            $this->group_member->role = 'member';
-        }
-        $this->group_member->save();
-        $this->response_payload['result'] ['updated_member'] = GroupMember::with('user')->find($this->group_member->id);
-        return true;
     }
 
     protected function object_function_authority_check($action) {
@@ -189,31 +277,31 @@ class GroupMemberController extends API_Controller
             $action_on_member = 'other';
         }
 
-        $conditions_array = ['owner.active.accept.other',
+        $conditions_array = ['owner.active.activate.other',
                              'owner.active.block.other',
                              'owner.active.changeRole.other',
-                             'owner.active.delete.other',
+                             'owner.active.remove.other',
                              'owner.active.joinRequest.other',
-                             'admin.active.accept.other',
+                             'admin.active.activate.other',
                              'admin.active.block.other',
                              'admin.active.changeRole.self',
                              'admin.active.changeRole.other',
-                             'admin.active.delete.self',
-                             'admin.active.delete.other',
+                             'admin.active.remove.self',
+                             'admin.active.remove.other',
                              'admin.active.joinRequest.other',
-                             'member.request.delete.self',
-                             'member.request.accept.self', 
+                             'member.requested.remove.self',
+                             'member.invited.activate.self',
                              'not-a-member.not-a-member.joinRequest.self'
                             ];
         
         // Story not in correct state for requested action
-        $check_condition = $user_role . '.' . $user_status . '.' . $action . '.' . $action_on_member;
+        $check_condition = $member_role . '.' . $member_status . '.' . $action . '.' . $action_on_member;
 
         if (!in_array($check_condition, $conditions_array)) {
             $this->response_payload['add-on-data'] = ['check_condition' => $check_condition, 
                                                         'conditions_array' => $conditions_array];
             $this->rest_response = $this->rest_405_methodNotAllowed;
-            $this->response_payload['logic_errors'] = 'Group resource Status / Action Mismatch';
+            $this->response_payload['logic_errors'] = 'Group Member resource Status / Action Mismatch';
             return false;
         }
 
