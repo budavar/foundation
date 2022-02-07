@@ -21,12 +21,12 @@ class GroupController extends API_Controller
 
     // ENTRY POINTS
 
-    /**public function activate(Request $request, $group_id) {
+    public function close(Request $request, $group_id) {
         $this->group_id = $group_id;
         $this->v_4xx_validation = true;
         $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Activated');
         return Response()->json($this->response_payload, $this->rest_response); 
-    }*/
+    }
 
     public function create(Request $request) {
         $this->v_object_function_authority_check = false;
@@ -35,16 +35,16 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    /**public function delete(Request $request, $group_id) {
-        $this->group_id = $group_id;
-        $this->v_4xx_validation = true;
-        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deleted');
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }*/
-
     public function mygroups(Request $request) { 
         $this->v_object_function_authority_check = false;
         $this->_process_control($request, __FUNCTION__, $this->rest_200_ok, null);
+        return Response()->json($this->response_payload, $this->rest_response); 
+    }
+
+    public function open(Request $request, $group_id) {
+        $this->group_id = $group_id;
+        $this->v_4xx_validation = true;
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deactivated');
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
@@ -60,13 +60,6 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    public function suspend(Request $request, $group_id) {
-        $this->group_id = $group_id;
-        $this->v_4xx_validation = true;
-        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, 'Group Deactivated');
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }
-
     public function update(Request $request, $group_id) { 
         $this->group_id = $group_id;
         $this->setupValidationRules($request, 'update');
@@ -74,19 +67,10 @@ class GroupController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
-    /**public function update_image(Request $request, $group_id) { 
-        $this->group_id = $group_id;
-        $this->v_422_rules = [ 
-            'imgSrc' => 'required'
-        ];
-        $this->_process_control($request, $group_id, __FUNCTION__, $this->rest_202_accepted, 'Group Image Updated');
-        return Response()->json($this->response_payload, $this->rest_response); 
-    }*/
-
     // PROCESSING LOGIC
-
-    protected function p_activate(Request $request) {
-        $this->group->status = 'active';
+    
+    protected function p_close(Request $request) {
+        $this->group->status = 'closed';
         $this->group->update();
         $this->response_payload = $this->returnGroup($this->group_id);
         return true;
@@ -119,13 +103,6 @@ class GroupController extends API_Controller
 
         return true;
     }
-    
-    protected function p_deactivate(Request $request) {
-        $this->group->status = 'inactive';
-        $this->group->update();
-        $this->response_payload = $this->returnGroup($this->group_id);
-        return true;
-    }
 
     protected function p_delete(Request $request) {
         $this->group->delete();
@@ -144,6 +121,13 @@ class GroupController extends API_Controller
                     ->orderBy('name')
                     ->get();
 
+        return true;
+    }
+
+    protected function p_open(Request $request) {
+        $this->group->status = 'active';
+        $this->group->update();
+        $this->response_payload = $this->returnGroup($this->group_id);
         return true;
     }
 
@@ -204,40 +188,22 @@ class GroupController extends API_Controller
         return $this->p_retrieve($request);
     }
 
-    protected function p_update_image(Request $request) {
-        $save_image = $this->group->image;
-        $this->group->image = $this->saveBase64AsFile('App\Models\Group', $request->imgSrc);
-        $this->group->image_history = $this->imageHistory($save_image, $this->group->image_history);
-        $this->group->update();
-        $this->response_payload['result'] ['new_image'] = $this->group->image;
-
-        $this->response_payload = $this->returnGroup($this->group_id);
-        return true;
-    }
-
     // VALIDATION LOGIC
 
-    protected function v_4XX_open(Request $request) {
-        if ($this->group->status != 'inactive' ) {
+    protected function v_4XX_close (Request $request) {
+        if ($this->group->status != 'active' ) {
             $this->rest_response = $this->rest_405_methodNotAllowed;
-            $this->response_payload['logic-errors'] = 'Group is not inactive'; 
+            $this->response_payload['logic-errors'] = 'Group is not active'; 
             return false;
         } else {
             return true;
         }
     }
 
-    protected function v_4XX_delete (Request $request) {
-
-        // Needs work 
-
-        return true;
-    }
-
-    protected function v_4XX_deactivate (Request $request) {
-        if ($this->group->status != 'active' ) {
+    protected function v_4XX_open(Request $request) {
+        if ($this->group->status != 'closed' ) {
             $this->rest_response = $this->rest_405_methodNotAllowed;
-            $this->response_payload['logic-errors'] = 'Group is not active'; 
+            $this->response_payload['logic-errors'] = 'Group is not closed'; 
             return false;
         } else {
             return true;
@@ -336,11 +302,11 @@ class GroupController extends API_Controller
 
         // member Role . member status . function . group status
 
-        $conditions_array = ['owner.active.activate.suspended',
-                             'owner.retrieve.delete.suspended',
-                             'owner.retrieve.retrieve.*',
-                             'owner.retrieve.suspend.active',
-                             'owner.retrieve.update.*',
+        $conditions_array = ['owner.active.open.closed',
+                             'owner.active.close.active',
+                             'owner.active.delete.closed',
+                             'owner.active.retrieve.*',
+                             'owner.active.update.*',
                              'admin.active.retrieve.*',
                              'admin.active.update.*',
                              'member.active.retrieve.*',
@@ -354,7 +320,7 @@ class GroupController extends API_Controller
 
         if (!in_array($check_condition_1, $conditions_array)
             && !in_array($check_condition_2, $conditions_array)) {
-            $this->response_payload['add-on-data'] = ['check_condition' => $check_condition_1 . ' - ' . $check_condition_2 . ' - ' . $check_condition_3 . ' - ' . $check_condition_4, 
+            $this->response_payload['add-on-data'] = ['check_condition' => $check_condition_1 . ' - ' . $check_condition_2, 
                                                         'conditions_array' => $conditions_array];
             $this->rest_response = $this->rest_405_methodNotAllowed;
             $this->response_payload['logic_errors'] = 'Group resource Status / Action Mismatch';

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
+use \Carbon\Carbon;
 use App\Models\Group;
 use App\Models\GroupMember;
 use App\Models\User;
@@ -61,6 +62,15 @@ class GroupMemberController extends API_Controller
         return Response()->json($this->response_payload, $this->rest_response); 
     }
 
+    public function updateSettings(Request $request, $group_member_id) { 
+        $this->group_member_id = $group_member_id;
+        $this->v_422_rules = [ 
+            'mute_notifications' => 'required|in:do-not-mute,one-week,one-month,always',
+        ];
+        $this->_process_control($request, __FUNCTION__, $this->rest_202_accepted, null);
+        return Response()->json($this->response_payload, $this->rest_response); 
+    }
+
     // PROCESSING LOGIC
 
     protected function p_activate(Request $request) {
@@ -93,6 +103,8 @@ class GroupMemberController extends API_Controller
         $group_member->user_id = $request->user_id;
         $group_member->role = 'member';
 
+        $group_member->mute_notifications_until = Carbon::now()->setTimezone('UTC')->format('Y-m-d H:i:s');
+
         if (Auth::id() == $request->user_id) {
             $group_member->status = 'requested';
         } else {
@@ -111,7 +123,32 @@ class GroupMemberController extends API_Controller
 
     protected function p_remove(Request $request) {
         $this->group_member->delete();
-        $this->response_payload = $this->returnMember($this->group_member);
+        $this->response_payload = $this->returnMember($this->group_member->id);
+        return true;
+    }
+
+    protected function p_updateSettings(Request $request) {
+
+        switch ($request->mute_notifications) {
+            case 'do-not-mute':
+                $date = Carbon::now()->setTimezone('UTC');
+                break;
+            case 'one-week':
+                $date = Carbon::now()->setTimezone('UTC')->add(1, 'week');
+                break;
+            case 'one-month':
+                $date = Carbon::now()->setTimezone('UTC')->add(1, 'month');
+                break;
+            case 'always':
+                $date = Carbon::now()->setTimezone('UTC')->add(100, 'year');
+                break;
+        };
+
+        $this->group_member->mute_notifications = $request->mute_notifications;
+        $this->group_member->mute_notifications_until = $date->toDateTimeString();
+
+        $this->group_member->update();
+        $this->response_payload = $this->returnMember($this->group_member->id);
         return true;
     }
 
@@ -282,15 +319,22 @@ class GroupMemberController extends API_Controller
                              'owner.active.changeRole.other',
                              'owner.active.remove.other',
                              'owner.active.joinRequest.other',
+                             'owner.active.update.other',
+                             'owner.active.updateSettings.self',
+                             'owner.closed.updateSettings.self',
                              'admin.active.activate.other',
                              'admin.active.block.other',
                              'admin.active.changeRole.self',
                              'admin.active.changeRole.other',
                              'admin.active.remove.self',
                              'admin.active.remove.other',
+                             'admin.active.updateSettings.self',
+                             'admin.closed.updateSettings.self',
                              'admin.active.joinRequest.other',
                              'member.requested.remove.self',
                              'member.invited.activate.self',
+                             'member.active.updateSettings.self',
+                             'member.closed.updateSettings.self',
                              'not-a-member.not-a-member.joinRequest.self'
                             ];
         
@@ -305,7 +349,7 @@ class GroupMemberController extends API_Controller
             return false;
         }
 
-        if ($target_member_role == 'owner') {
+        if ($target_member_role == 'owner' && $action != 'updateSettings') {
             $this->rest_response = $this->rest_405_methodNotAllowed;
             $this->response_payload['logic_errors'] = 'Not allowed to perform action on owner profile';
             return false;

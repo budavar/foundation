@@ -55,10 +55,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
   Route::get('groups', [GroupController::class, 'mygroups'])->name('group.list');
   Route::post('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
   Route::post('groups', [GroupController::class, 'create'])->name('group.create');
+  Route::put('groups/{group_id}/close', [GroupController::class, 'close'])->name('group.close');
+  Route::put('groups/{group_id}/open', [GroupController::class, 'open'])->name('group.open');
 
   // GROUP MEMBERS
   Route::post('groups/{group_id}/new-member', [GroupMemberController::class, 'joinRequest'])->name('group.joinRequest');
   Route::delete('group-members/{group_member_id}', [GroupMemberController::class, 'remove'])->name('groupMember.remove');
+  Route::put('group-members/{group_member_id}/update-settings', [GroupMemberController::class, 'updateSettings'])->name('groupMember.updateSettings');
   Route::put('group-members/{group_member_id}/activate', [GroupMemberController::class, 'activate'])->name('groupMember.activate');
   Route::put('group-members/{group_member_id}/block', [GroupMemberController::class, 'block'])->name('groupMember.block');
   Route::put('group-members/{group_member_id}/change-member-role', [GroupMemberController::class, 'changeRole'])->name('groupMember.chnageRole');
