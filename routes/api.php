@@ -66,15 +66,4 @@ Route::middleware(['auth:sanctum'])->group(function () {
   Route::put('group-members/{group_member_id}/block', [GroupMemberController::class, 'block'])->name('groupMember.block');
   Route::put('group-members/{group_member_id}/change-member-role', [GroupMemberController::class, 'changeRole'])->name('groupMember.chnageRole');
 
-
-  //Route::put('groups/{group_id}/updateimage', [GroupController::class, 'update_image'])->name('group.update_image');
-  //Route::put('groups/{group_id}', [GroupController::class, 'update'])->name('group.update');
-  //Route::put('groups/{group_id}/open', [GroupController::class, 'open'])->name('group.open');
-  //Route::put('groups/{group_id}/close', [GroupController::class, 'close'])->name('group.close');
-  //Route::post('groups/{group_id}/like', [socialController::class, 'like'])->name('group.like');
-  //Route::post('groups/{group_id}/unlike', [socialController::class, 'unlike'])->name('group.unlike');
-
-
-
-
 });

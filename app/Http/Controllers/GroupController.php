@@ -70,9 +70,14 @@ class GroupController extends API_Controller
     // PROCESSING LOGIC
     
     protected function p_close(Request $request) {
+
+        GroupMember::where('group_id', '=', $this->group_id)->whereIn('status', ['invited', 'requested'])->delete();
+
         $this->group->status = 'closed';
         $this->group->update();
-        $this->response_payload = $this->returnGroup($this->group_id);
+
+        $this->response_payload = Group::with(array('members', 'members.user'))->find($this->group_id);
+        $this->response_payload ['_my_authority'] = $this->_my_authority;
         return true;
     }
 
@@ -104,11 +109,6 @@ class GroupController extends API_Controller
         return true;
     }
 
-    protected function p_delete(Request $request) {
-        $this->group->delete();
-        return true;
-    }
-
     protected function p_mygroups(Request $request) {
 
         $myGroup_ids = GroupMember::select('group_id')->where('user_id' ,'=', Auth::id())->where('status', '!=', 'blocked')
@@ -127,7 +127,8 @@ class GroupController extends API_Controller
     protected function p_open(Request $request) {
         $this->group->status = 'active';
         $this->group->update();
-        $this->response_payload = $this->returnGroup($this->group_id);
+        $this->response_payload = Group::with(array('members', 'members.user'))->find($this->group_id);
+        $this->response_payload ['_my_authority'] = $this->_my_authority;
         return true;
     }
 
