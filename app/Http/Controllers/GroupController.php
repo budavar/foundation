@@ -76,6 +76,13 @@ class GroupController extends API_Controller
         $this->group->status = 'closed';
         $this->group->update();
 
+        if ($old_group_name !== $this->group->name) {
+            $this->p_activity->primary_entity_type = 'Group';
+            $this->p_activity->primary_entity_id = $this->group->id;
+            $this->p_activity->n_to_user_list = 'group-members';
+            $this->p_activity->n_user_list_deep_link = 'groups/' . $this->group->id;
+        }
+
         $this->response_payload = Group::with(array('members', 'members.user'))->find($this->group_id);
         $this->response_payload ['_my_authority'] = $this->_my_authority;
         return true;
@@ -106,6 +113,9 @@ class GroupController extends API_Controller
 
         $this->response_payload = $this->returnGroup($this->group_id);
 
+        $this->p_activity->primary_entity_type = 'Group';
+        $this->p_activity->primary_entity_id = $this->group->id;
+
         return true;
     }
 
@@ -127,6 +137,14 @@ class GroupController extends API_Controller
     protected function p_open(Request $request) {
         $this->group->status = 'active';
         $this->group->update();
+
+        if ($old_group_name !== $this->group->name) {
+            $this->p_activity->primary_entity_type = 'Group';
+            $this->p_activity->primary_entity_id = $this->group->id;
+            $this->p_activity->n_to_user_list = 'group-members';
+            $this->p_activity->n_user_list_deep_link = 'groups/' . $this->group->id;
+        }
+
         $this->response_payload = Group::with(array('members', 'members.user'))->find($this->group_id);
         $this->response_payload ['_my_authority'] = $this->_my_authority;
         return true;
@@ -173,6 +191,8 @@ class GroupController extends API_Controller
 
     protected function p_update(Request $request) {
 
+        $old_group_name = $this->group->name;
+
         $this->group->name = $request->name;
         $this->group->description = $request->description;
         //$this->group->visibility = $request->visibility;
@@ -185,6 +205,16 @@ class GroupController extends API_Controller
         }
 
         $this->group->update();
+
+        if ($old_group_name !== $this->group->name) {
+            $this->p_activity->override('group.titleChange');
+            $this->p_activity->primary_entity_type = 'Group';
+            $this->p_activity->primary_entity_id = $this->group->id;
+            $this->p_activity->meta_old_value = $old_group_name;
+            $this->p_activity->meta_new_value = $this->group->name;
+            $this->p_activity->n_to_user_list = 'group-members';
+            $this->p_activity->n_user_list_deep_link = 'groups/' . $this->group->id;
+        }
         
         return $this->p_retrieve($request);
     }

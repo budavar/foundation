@@ -66,4 +66,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
   Route::put('group-members/{group_member_id}/block', [GroupMemberController::class, 'block'])->name('groupMember.block');
   Route::put('group-members/{group_member_id}/change-member-role', [GroupMemberController::class, 'changeRole'])->name('groupMember.chnageRole');
 
+  // GROUP MEMBERS
+  Route::get('notifications', [NotificationController::class, 'list'])->name('notification.list');
+  Route::put('notifications/{notification_id}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notification.markAsRead');
+  Route::put('notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notification.markAllAsRead');
+  Route::delete('notifications/{notification_id}', [NotificationController::class, 'delete'])->name('notification.delete');
+
 });

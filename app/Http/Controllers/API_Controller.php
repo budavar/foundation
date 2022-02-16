@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-//use App\Models\Activity;
+use App\HelperClasses\ActivityNotification;
 
 use Validator;
 
@@ -57,12 +57,7 @@ class API_Controller extends BaseController
     protected $p_route_action = null;
     protected $p_route_model = null;
 
-    protected $p_activity = null;
-    protected $p_route_meta = null;
-    //protected $p_route_meta_dft = [ 
-        //'activity' => [ 'log' => false, 'log_check' => null, 'name' => null, 'remove' => false ],
-        //'notification' => null
-    //];
+    protected $p_activity;
 
     protected function _process_control($request, $method, $rest_response_code, $rest_response_status) 
     {
@@ -71,12 +66,7 @@ class API_Controller extends BaseController
         $this->p_route_action = $this->p_route_array[1];
         $this->p_route_model = 'App\\Models\\' . ucfirst($this->p_route_object);
 
-        //$this->p_route_meta = config('route_meta_data.' . implode('-', $this->p_route_array), $this->p_route_meta_dft);
-        //if ($this->p_route_meta['activity'] ['name'] == '*') {
-            //$this->p_route_meta['activity'] ['name'] = $request->route()->getName();
-        //}
-
-        //$this->_init_activity();
+        $this->p_activity = new ActivityNotification($request->route()->getName());
     
         if ($this->v_object_function_authority_check) {
             if (!$this->object_function_authority_check($method)) {
@@ -122,12 +112,7 @@ class API_Controller extends BaseController
             $function = 'p_' . $method;
             if ($this->$function($request)) {
 
-                //if ($this->p_route_meta['activity'] ['log']) {
-                    //$this->_save_activity();
-                //}
-                //if ($this->p_route_meta['activity'] ['remove']) {
-                    //$this->_cleanup_activity();
-                //}
+                $this->p_activity->publish();
 
                 if ($this->p_commit) {              
                     DB::commit();  
@@ -156,28 +141,4 @@ class API_Controller extends BaseController
 
         return true;
     }
-
-    protected function _cleanup_activity() {
-
-    }
-
-    //protected function _init_activity() {
-        //$this->p_activity = new Activity;
-        //$this->p_activity->type = $this->p_route_meta['activity'] ['name'];
-        //$this->p_activity->scoping_object_type = null;
-        //$this->p_activity->scoping_object_id = null;
-        //$this->p_activity->primary_object_type = null;
-        //$this->p_activity->primary_object_id = null;
-        //$this->p_activity->post_id = null;
-        //$this->p_activity->comment_id = null;
-        //$this->p_activity->reply_id = null;
-        //$this->p_activity->activity_user_id = Auth::id();
-        //$this->p_activity->ref_user_id = null;
-        //$this->p_activity->ref_user_role = null;
-    //}
-
-    //protected function _save_activity() {
-        //$this->p_activity->save();
-    //}
-
 }
